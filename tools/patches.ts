@@ -23,7 +23,7 @@ export interface PatchSpec {
 
 export const PATCHES: readonly PatchSpec[] = [
   {
-    key: '@better-auth/oauth-provider@1.7.11',
+    key: '@better-auth/oauth-provider@1.7.14',
     entry: '@better-auth/oauth-provider',
     from: 'apps/web/src',
     source: 'patches/better-auth-oauth-provider/revoke.diff',

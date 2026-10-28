@@ -1,0 +1,22 @@
+diff --git a/dist/authorize-B1Bc3IL6.mjs b/dist/authorize-B1Bc3IL6.mjs
+index b60fcb71b9818b580a7407f301f237f430647486..e9c69b1d9598f9731d2d50ca62055de558cf717f 100644
+--- a/dist/authorize-B1Bc3IL6.mjs
++++ b/dist/authorize-B1Bc3IL6.mjs
+@@ -6326,7 +6326,7 @@ async function revokeEndpoint(ctx, opts) {
+ 	} catch (error) {
+ 		if (error instanceof APIError$1) {
+ 			if (error.body?.error === "unsupported_token_type") throw error;
+-			if (error.name === "BAD_REQUEST") return null;
++			if (error.status === "BAD_REQUEST") return null;
+ 			throw error;
+ 		} else if (error instanceof Error) {
+ 			logger.error("Introspection error:", error.message, error.stack);
+diff --git a/dist/index.mjs b/dist/index.mjs
+index e60d8e132f2a6731b0310ea11e4c24f03412717d..1a6a4cff20e832b140ebd68f982483656e85b54f 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1,3 +1,4 @@
++// @better-auth/oauth-provider 1.7.14 + goblin patches/better-auth-oauth-provider 2170866cf248
+ import { _ as extractRepeatedResourceFromForm, b as oauthClientMetadataSchema, d as metadataResponse, f as oauthAuthorizationServerMetadata, g as getOAuthProviderApi, h as oidcServerMetadata, i as oauthProvider, m as oauthProviderOpenIdConfigMetadata, n as DEFAULT_OAUTH_SCOPES, p as oauthProviderAuthServerMetadata, r as getOAuthProviderState, s as consumeClientAssertion, t as getIssuer, u as authServerMetadata, v as resolveResourcePolicy, y as ResourceUriSchema } from "./authorize-B1Bc3IL6.mjs";
+ import { L as extendOAuthProvider, M as verifyOAuthQueryParams, O as toAudienceClaim, g as normalizeClientAuthenticationParameters, j as validateClientScopes, k as toResourceList, s as getClient, u as getOAuthProviderPlugin } from "./utils-BCF8dHDe.mjs";
+ import { t as createResourceServerChallenge } from "./resource-challenge-CiJTlsEh.mjs";
