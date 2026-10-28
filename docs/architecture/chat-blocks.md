@@ -7,13 +7,16 @@ JSON spec (`ChartSpec`, `MapSpec` in `packages/kit/src/specs.ts`). `MessageText`
 (`components/parts/text-part.tsx`) hands such a block to `RichBlock` (`components/parts/blocks.tsx`), which loads that kind's module from `@goblin/kit`
 on first use and shows the plain code block whenever the source does not parse or drawing fails. While a reply
 streams, the block whose fence is still open stays code: Streamdown parses each block on its own and says which one
-that is (`useIsCodeFenceIncomplete`). A diagram is beautiful-mermaid's SVG as an
-`<img>` data URI with the theme's tokens resolved to concrete colours, so nothing in it runs or loads; it redraws when
-the theme changes. **Explore diagram** opens the kit's native dialog with Panzoom 4.6.2, fitted 1–4× zoom,
-bounded dragging/pinch gestures and keyboard node selection. `diagram-svg.ts` rebuilds a passive, allowlisted SVG,
-scopes the renderer CSS and namespaces marker IDs; model callbacks, links, font imports and external paint URLs
-are discarded before inline insertion. `Diagram` defaults to interactive; `interactive={false}` keeps only the image.
-The dialog stays inside an agent app's frame. Charts are Recharts in the five `--chart-*` tokens; maps are Leaflet over
+that is (`useIsCodeFenceIncomplete`). A diagram is drawn inline by Pele (ADR 0129), any Mermaid kind, laid out
+for its column's width and loading only its kind's renderer. Every drawing passes `diagram-svg.ts`, which rebuilds it
+in a detached tree from Pele's passive vocabulary: shapes, text, Pele's classes and variables and its `data-id`s; ids,
+links, scripts, handlers, styles, URLs and a diagram's own classes never reach the page. goblin fixes Pele's options
+(`diagram-render.ts`: no links, no images, bounded source and edges). `kit.css` maps the theme's tokens to Pele's
+`--pele-*` variables, so light and dark follow the page without a redraw. **Explore diagram** draws the same source at
+its natural size in the kit's native dialog, with Panzoom 4.6.2, fitted 1–4× zoom, bounded dragging/pinch gestures and
+keyboard node selection; a graph kind's neighbours come from Pele's parsed model (`diagram-graph.ts`), and other kinds
+zoom and pan without selectable nodes. `Diagram` defaults to interactive; `interactive={false}` draws without the
+explorer. The dialog stays inside an agent app's frame. Charts are Recharts in the five `--chart-*` tokens; maps are Leaflet over
 OpenStreetMap's raster tiles, quieted to the theme by a CSS filter, the one host a block fetches from. The persona prefers ordinary Markdown and describes the supported fence grammars; text-only external message tools receive the fenced text.
 
 ## Interactive replies

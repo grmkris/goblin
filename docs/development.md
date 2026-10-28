@@ -330,9 +330,9 @@ until it runs, real provider and Telegram delivery remain unverified.
   bounded report into this conversation. New thread moves the prose, chips and attachments into a new thread's draft
   in the panel. Failed selections preserve the draft and mark the failing chip. These controls work in channels,
   threads and drafts.
-- **Figures.** Assistant replies can draw Mermaid, chart and map fences. Ordinary Markdown is the
+- **Figures.** Assistant replies can draw Mermaid (any kind, drawn inline by Pele), chart and map fences. Ordinary Markdown is the
   default for checklists, timelines, comparisons and small sets of values. Open streaming fences, invalid specs and
-  drawing failures stay readable code. **Explore diagram** opens zoom, pan and node connections: scroll or pinch to
+  drawing failures stay readable code. **Explore diagram** opens zoom, pan and, for graph kinds, node connections: scroll or pinch to
   zoom, drag or use arrows when zoomed, and select a node by click, tap, Enter or Space. Fit restores the view; Escape
   clears selection, then closes. Agent-app views share the kit; see `app_docs` topic `ui`. Local browser acceptance:
   build the app runtime with `heavy bun run --cwd packages/app build`, then run `heavy bun apps/web/test/ui-diagram.ts`.

@@ -24,7 +24,7 @@ channel work. Start begins with a goal, preserves the draft through setup, then 
 
 Tool calls expand in place to readable input and output, with folding JSON branches, formatted Markdown, full-value
 copying and a Raw view.
-The agent's replies draw Mermaid diagrams, charts and maps from fenced blocks, in the theme's colours.
+The agent's replies draw Mermaid diagrams of any kind, charts and maps from fenced blocks, in the theme's colours.
 Diagrams offer an explorer with zoom, pan and node connections, shared with agent apps. Complete `openui` fences
 can show small forms, choices and dashboards using Goblin's components. Their buttons send visible choices and
 form values as ordinary follow-up messages; they grant no tool permissions. Field edits reset on reload.
