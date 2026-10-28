@@ -7,8 +7,8 @@
     "dev": "vite --host 127.0.0.1 --port 18983 --strictPort",
     "build": "vite build",
     "typecheck": "bun ../../tools/typecheck.ts tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run",
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:unit": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
     "test:browser": "bun test/browser.ts",
     "plan": "alchemy plan --stage preview --config alchemy.run.ts",
     "deploy": "alchemy deploy --stage preview --config alchemy.run.ts --yes"

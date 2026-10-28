@@ -13,8 +13,8 @@
   },
   "scripts": {
     "typecheck": "bun ../../tools/typecheck.ts tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:unit": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "dependencies": {
     "@panzoom/panzoom": "4.6.2",

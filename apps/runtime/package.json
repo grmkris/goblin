@@ -11,10 +11,10 @@
   },
   "scripts": {
     "typecheck": "bun ../../tools/typecheck.ts tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run --config vitest.config.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:integration:permuted": "vitest run --config vitest.permuted.config.ts"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:unit": "vitest run --config vitest.config.ts --fsModuleCachePath node_modules/.vitest-cache",
+    "test:integration": "vitest run --config vitest.integration.config.ts --fsModuleCachePath node_modules/.vitest-cache",
+    "test:integration:permuted": "vitest run --config vitest.permuted.config.ts --fsModuleCachePath node_modules/.vitest-cache"
   },
   "dependencies": {
     "@better-auth/cimd": "1.7.14",

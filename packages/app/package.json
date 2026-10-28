@@ -14,8 +14,8 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "typecheck": "bun ../../tools/typecheck.ts tsconfig.json tsconfig.ui.json tsconfig.render.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:unit": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "dependencies": {
     "@goblin/kit": "workspace:*",

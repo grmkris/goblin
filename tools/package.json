@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "bun typecheck.ts tsconfig.json",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
+    "test:unit": "vitest run --fsModuleCachePath node_modules/.vitest-cache"
   },
   "devDependencies": {
     "@effect/tsgo": "0.63.0",
